@@ -40,7 +40,8 @@ type Entry struct {
 
 	// Message passed to Debug, Info, Warn, Error, Fatal or Panic
 	Message string
-
+	// Message had Format
+	FormatMsg []byte
 	// When formatter is called in entry.log(), an Buffer may be set to entry
 	Buffer *bytes.Buffer
 }
@@ -108,13 +109,15 @@ func (entry Entry) log(level Level, msg string) {
 	entry.Level = level
 	entry.Message = msg
 
-	entry.fireHooks()
-
 	buffer = bufferPool.Get().(*bytes.Buffer)
 	buffer.Reset()
 	defer bufferPool.Put(buffer)
 	entry.Buffer = buffer
 
+	err:=entry.Format()
+	if err!=nil {
+		return
+	}
 	entry.write()
 
 	entry.Buffer = nil
@@ -126,27 +129,29 @@ func (entry Entry) log(level Level, msg string) {
 		panic(&entry)
 	}
 }
-
-func (entry *Entry) fireHooks() {
-	entry.Logger.mu.Lock()
-	defer entry.Logger.mu.Unlock()
-	err := entry.Logger.Hooks.Fire(entry.Level, entry)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to fire hook: %v\n", err)
-	}
-}
-
-func (entry *Entry) write() {
+func (entry *Entry)Format() error {
 	entry.Logger.mu.Lock()
 	defer entry.Logger.mu.Unlock()
 	serialized, err := entry.Logger.Formatter.Format(entry)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to obtain reader, %v\n", err)
-	} else {
-		_, err = entry.Logger.Out.Write(serialized)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to write to log, %v\n", err)
-		}
+		return err
+	}
+	entry.FormatMsg=serialized
+	return err
+}
+
+func (entry *Entry) write() {
+	entry.Logger.mu.Lock()
+	defer entry.Logger.mu.Unlock()
+
+	_, err := entry.Logger.Out.Write(entry.FormatMsg)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to write to log, %v\n", err)
+	}
+	err = entry.Logger.Hooks.Fire(entry.Level, entry)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to fire hook: %v\n", err)
 	}
 }
 
