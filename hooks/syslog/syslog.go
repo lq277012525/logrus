@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/syslog"
 	"os"
-
 	"github.com/sirupsen/logrus"
 )
 
