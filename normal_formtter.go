@@ -19,9 +19,15 @@ type NormalFormatter struct {
 	//%T [%L](%D):%M
 	Partten  string
 	parttenSplite [][]byte
+	DebugDep int
 	sync.Once
 }
+func NewNormalFormatter()*NormalFormatter{
 
+	return &NormalFormatter{
+		DebugDep:8,
+	}
+}
 func GetGID() uint64 {
 	b := make([]byte, 64)
 	b = b[:runtime.Stack(b, false)]
@@ -31,8 +37,7 @@ func GetGID() uint64 {
 	return n
 }
 func  (f *NormalFormatter)LogDebug() string{
-	calldeep:=8
-	_, file, line, ok := runtime.Caller(calldeep)
+	_, file, line, ok := runtime.Caller(f.DebugDep)
 	if !ok {
 
 		file = "???"
